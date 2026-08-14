@@ -28,14 +28,10 @@ class MainActivity : AppCompatActivity() {
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var mediaController: MediaController? = null
 
-    private val permissionLauncher =
+    private val notificationPermissionLauncher =
         registerForActivityResult(
             ActivityResultContracts.RequestPermission()
-        ) { granted ->
-            if (granted) {
-                openMusicPicker()
-            }
-        }
+        ) { }
 
     private val musicPicker =
         registerForActivityResult(
@@ -68,19 +64,20 @@ class MainActivity : AppCompatActivity() {
         songText = findViewById(R.id.songText)
         artistText = findViewById(R.id.artistText)
 
+        requestNotificationPermission()
+
         chooseMusicButton.setOnClickListener {
-            checkPermissionAndOpenPicker()
+            openMusicPicker()
         }
 
         playButton.setOnClickListener {
+
             mediaController?.let { controller ->
 
                 if (controller.isPlaying) {
                     controller.pause()
-                    playButton.text = "PLAY"
                 } else {
                     controller.play()
-                    playButton.text = "PAUSE"
                 }
             }
         }
@@ -88,19 +85,47 @@ class MainActivity : AppCompatActivity() {
         connectToMusicService()
     }
 
+    private fun requestNotificationPermission() {
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+
+            if (
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+
+                notificationPermissionLauncher.launch(
+                    Manifest.permission.POST_NOTIFICATIONS
+                )
+            }
+        }
+    }
+
+    private fun openMusicPicker() {
+        musicPicker.launch("audio/*")
+    }
+
     private fun connectToMusicService() {
 
         val sessionToken = SessionToken(
             this,
-            ComponentName(this, MusicService::class.java)
+            ComponentName(
+                this,
+                MusicService::class.java
+            )
         )
 
         controllerFuture =
-            MediaController.Builder(this, sessionToken)
-                .buildAsync()
+            MediaController.Builder(
+                this,
+                sessionToken
+            ).buildAsync()
 
         controllerFuture?.addListener(
             {
+
                 try {
 
                     mediaController = controllerFuture?.get()
@@ -113,14 +138,33 @@ class MainActivity : AppCompatActivity() {
                             override fun onIsPlayingChanged(
                                 isPlaying: Boolean
                             ) {
+
                                 playButton.text =
-                                    if (isPlaying) "PAUSE" else "PLAY"
+                                    if (isPlaying) {
+                                        "PAUSE"
+                                    } else {
+                                        "PLAY"
+                                    }
+                            }
+
+                            override fun onMediaItemTransition(
+                                mediaItem: MediaItem?,
+                                reason: Int
+                            ) {
+
+                                songText.text =
+                                    mediaItem?.mediaMetadata?.title
+                                        ?: "Playing music"
+
+                                artistText.text =
+                                    mediaItem?.mediaMetadata?.artist
+                                        ?: "Local file"
                             }
                         }
                     )
 
-                } catch (e: Exception) {
-                    e.printStackTrace()
+                } catch (exception: Exception) {
+                    exception.printStackTrace()
                 }
 
             },
@@ -128,54 +172,12 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun checkPermissionAndOpenPicker() {
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-
-            if (
-                ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.READ_MEDIA_AUDIO
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-
-                permissionLauncher.launch(
-                    Manifest.permission.READ_MEDIA_AUDIO
-                )
-
-            } else {
-                openMusicPicker()
-            }
-
-        } else {
-
-            if (
-                ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.READ_EXTERNAL_STORAGE
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-
-                permissionLauncher.launch(
-                    Manifest.permission.READ_EXTERNAL_STORAGE
-                )
-
-            } else {
-                openMusicPicker()
-            }
-        }
-    }
-
-    private fun openMusicPicker() {
-
-        musicPicker.launch("audio/*")
-    }
-
     override fun onDestroy() {
 
         playerView.player = null
 
         mediaController?.release()
+
         controllerFuture?.cancel(false)
 
         super.onDestroy()
