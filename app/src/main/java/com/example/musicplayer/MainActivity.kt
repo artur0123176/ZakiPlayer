@@ -1,4 +1,4 @@
-package com.example.musicplayer
+        package com.example.musicplayer
 
 import android.Manifest
 import android.content.ComponentName
@@ -29,8 +29,11 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var musicAdapter: MusicAdapter
 
+    private var allSongs: List<Song> = emptyList()
+
     private var mediaController: MediaController? = null
-    private var controllerFuture: ListenableFuture<MediaController>? = null
+    private var controllerFuture:
+        ListenableFuture<MediaController>? = null
 
     private val permissionLauncher =
         registerForActivityResult(
@@ -40,7 +43,8 @@ class MainActivity : AppCompatActivity() {
             if (granted) {
                 loadMusic()
             } else {
-                songText.text = "Musiqalarga ruxsat berilmadi"
+                songText.text =
+                    "Musiqalarga ruxsat berilmadi"
             }
         }
 
@@ -49,10 +53,17 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_main)
 
-        playerView = findViewById(R.id.playerView)
-        songText = findViewById(R.id.songText)
-        artistText = findViewById(R.id.artistText)
-        musicList = findViewById(R.id.musicList)
+        playerView =
+            findViewById(R.id.playerView)
+
+        songText =
+            findViewById(R.id.songText)
+
+        artistText =
+            findViewById(R.id.artistText)
+
+        musicList =
+            findViewById(R.id.musicList)
 
         setupRecyclerView()
 
@@ -63,28 +74,28 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupRecyclerView() {
 
-        musicAdapter = MusicAdapter(
-            emptyList()
-        ) { song ->
+        musicAdapter =
+            MusicAdapter(emptyList()) { song ->
 
-            playSong(song)
-        }
+                playSong(song)
+            }
 
         musicList.layoutManager =
             LinearLayoutManager(this)
 
-        musicList.adapter = musicAdapter
+        musicList.adapter =
+            musicAdapter
     }
 
     private fun requestMusicPermission() {
 
         val permission =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-
+            if (
+                Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.TIRAMISU
+            ) {
                 Manifest.permission.READ_MEDIA_AUDIO
-
             } else {
-
                 Manifest.permission.READ_EXTERNAL_STORAGE
             }
 
@@ -107,17 +118,20 @@ class MainActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
 
-            songText.text = "Musiqalar qidirilmoqda..."
+            songText.text =
+                "Musiqalar qidirilmoqda..."
 
             val repository =
                 MusicRepository(contentResolver)
 
-            val songs =
+            allSongs =
                 repository.getAllSongs()
 
-            musicAdapter.updateSongs(songs)
+            musicAdapter.updateSongs(
+                allSongs
+            )
 
-            if (songs.isEmpty()) {
+            if (allSongs.isEmpty()) {
 
                 songText.text =
                     "Musiqa topilmadi"
@@ -128,7 +142,7 @@ class MainActivity : AppCompatActivity() {
             } else {
 
                 songText.text =
-                    "${songs.size} ta musiqa"
+                    "${allSongs.size} ta musiqa"
 
                 artistText.text =
                     "Qo‘shiqni tanlang"
@@ -176,27 +190,49 @@ class MainActivity : AppCompatActivity() {
 
     private fun playSong(song: Song) {
 
-        val metadata =
-            MediaMetadata.Builder()
-                .setTitle(song.title)
-                .setArtist(song.artist)
-                .setAlbumTitle(song.album)
-                .build()
+        val controller =
+            mediaController ?: return
 
-        val mediaItem =
-            MediaItem.Builder()
-                .setUri(song.uri)
-                .setMediaMetadata(metadata)
-                .build()
-
-        mediaController?.apply {
-
-            setMediaItem(mediaItem)
-
-            prepare()
-
-            play()
+        if (allSongs.isEmpty()) {
+            return
         }
+
+        val mediaItems =
+            allSongs.map { currentSong ->
+
+                val metadata =
+                    MediaMetadata.Builder()
+                        .setTitle(
+                            currentSong.title
+                        )
+                        .setArtist(
+                            currentSong.artist
+                        )
+                        .setAlbumTitle(
+                            currentSong.album
+                        )
+                        .build()
+
+                MediaItem.Builder()
+                    .setUri(currentSong.uri)
+                    .setMediaMetadata(metadata)
+                    .build()
+            }
+
+        val selectedIndex =
+            allSongs.indexOfFirst {
+                it.id == song.id
+            }
+
+        controller.setMediaItems(
+            mediaItems,
+            selectedIndex,
+            0L
+        )
+
+        controller.prepare()
+
+        controller.play()
 
         songText.text =
             song.title
