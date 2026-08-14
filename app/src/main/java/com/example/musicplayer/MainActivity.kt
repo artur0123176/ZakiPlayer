@@ -5,51 +5,42 @@ import android.content.ComponentName
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.widget.Button
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
+import androidx.media3.common.MediaMetadata
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import androidx.media3.ui.PlayerView
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var playerView: PlayerView
-    private lateinit var chooseMusicButton: Button
-    private lateinit var playButton: Button
     private lateinit var songText: TextView
     private lateinit var artistText: TextView
+    private lateinit var musicList: RecyclerView
 
-    private var controllerFuture: ListenableFuture<MediaController>? = null
+    private lateinit var musicAdapter: MusicAdapter
+
     private var mediaController: MediaController? = null
+    private var controllerFuture: ListenableFuture<MediaController>? = null
 
-    private val notificationPermissionLauncher =
+    private val permissionLauncher =
         registerForActivityResult(
             ActivityResultContracts.RequestPermission()
-        ) { }
+        ) { granted ->
 
-    private val musicPicker =
-        registerForActivityResult(
-            ActivityResultContracts.GetContent()
-        ) { uri ->
-
-            if (uri != null) {
-
-                val mediaItem = MediaItem.fromUri(uri)
-
-                mediaController?.apply {
-                    setMediaItem(mediaItem)
-                    prepare()
-                    play()
-                }
-
-                songText.text = "Playing music"
-                artistText.text = "Local file"
+            if (granted) {
+                loadMusic()
+            } else {
+                songText.text = "Musiqalarga ruxsat berilmadi"
             }
         }
 
@@ -59,63 +50,102 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         playerView = findViewById(R.id.playerView)
-        chooseMusicButton = findViewById(R.id.chooseMusicButton)
-        playButton = findViewById(R.id.playButton)
         songText = findViewById(R.id.songText)
         artistText = findViewById(R.id.artistText)
+        musicList = findViewById(R.id.musicList)
 
-        requestNotificationPermission()
+        setupRecyclerView()
 
-        chooseMusicButton.setOnClickListener {
-            openMusicPicker()
-        }
-
-        playButton.setOnClickListener {
-
-            mediaController?.let { controller ->
-
-                if (controller.isPlaying) {
-                    controller.pause()
-                } else {
-                    controller.play()
-                }
-            }
-        }
+        requestMusicPermission()
 
         connectToMusicService()
     }
 
-    private fun requestNotificationPermission() {
+    private fun setupRecyclerView() {
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        musicAdapter = MusicAdapter(
+            emptyList()
+        ) { song ->
 
-            if (
-                ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
+            playSong(song)
+        }
 
-                notificationPermissionLauncher.launch(
-                    Manifest.permission.POST_NOTIFICATIONS
-                )
+        musicList.layoutManager =
+            LinearLayoutManager(this)
+
+        musicList.adapter = musicAdapter
+    }
+
+    private fun requestMusicPermission() {
+
+        val permission =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+
+                Manifest.permission.READ_MEDIA_AUDIO
+
+            } else {
+
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            }
+
+        if (
+            ContextCompat.checkSelfPermission(
+                this,
+                permission
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+
+            loadMusic()
+
+        } else {
+
+            permissionLauncher.launch(permission)
+        }
+    }
+
+    private fun loadMusic() {
+
+        lifecycleScope.launch {
+
+            songText.text = "Musiqalar qidirilmoqda..."
+
+            val repository =
+                MusicRepository(contentResolver)
+
+            val songs =
+                repository.getAllSongs()
+
+            musicAdapter.updateSongs(songs)
+
+            if (songs.isEmpty()) {
+
+                songText.text =
+                    "Musiqa topilmadi"
+
+                artistText.text =
+                    "Telefon xotirasida audio fayl yo‘q"
+
+            } else {
+
+                songText.text =
+                    "${songs.size} ta musiqa"
+
+                artistText.text =
+                    "Qo‘shiqni tanlang"
             }
         }
     }
 
-    private fun openMusicPicker() {
-        musicPicker.launch("audio/*")
-    }
-
     private fun connectToMusicService() {
 
-        val sessionToken = SessionToken(
-            this,
-            ComponentName(
+        val sessionToken =
+            SessionToken(
                 this,
-                MusicService::class.java
+                ComponentName(
+                    this,
+                    MusicService::class.java
+                )
             )
-        )
 
         controllerFuture =
             MediaController.Builder(
@@ -128,48 +158,51 @@ class MainActivity : AppCompatActivity() {
 
                 try {
 
-                    mediaController = controllerFuture?.get()
+                    mediaController =
+                        controllerFuture?.get()
 
-                    playerView.player = mediaController
+                    playerView.player =
+                        mediaController
 
-                    mediaController?.addListener(
-                        object : Player.Listener {
+                } catch (e: Exception) {
 
-                            override fun onIsPlayingChanged(
-                                isPlaying: Boolean
-                            ) {
-
-                                playButton.text =
-                                    if (isPlaying) {
-                                        "PAUSE"
-                                    } else {
-                                        "PLAY"
-                                    }
-                            }
-
-                            override fun onMediaItemTransition(
-                                mediaItem: MediaItem?,
-                                reason: Int
-                            ) {
-
-                                songText.text =
-                                    mediaItem?.mediaMetadata?.title
-                                        ?: "Playing music"
-
-                                artistText.text =
-                                    mediaItem?.mediaMetadata?.artist
-                                        ?: "Local file"
-                            }
-                        }
-                    )
-
-                } catch (exception: Exception) {
-                    exception.printStackTrace()
+                    e.printStackTrace()
                 }
 
             },
             ContextCompat.getMainExecutor(this)
         )
+    }
+
+    private fun playSong(song: Song) {
+
+        val metadata =
+            MediaMetadata.Builder()
+                .setTitle(song.title)
+                .setArtist(song.artist)
+                .setAlbumTitle(song.album)
+                .build()
+
+        val mediaItem =
+            MediaItem.Builder()
+                .setUri(song.uri)
+                .setMediaMetadata(metadata)
+                .build()
+
+        mediaController?.apply {
+
+            setMediaItem(mediaItem)
+
+            prepare()
+
+            play()
+        }
+
+        songText.text =
+            song.title
+
+        artistText.text =
+            song.artist
     }
 
     override fun onDestroy() {
