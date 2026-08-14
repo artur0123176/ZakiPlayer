@@ -11,46 +11,59 @@
         android:id="@+id/titleText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="20dp"
+        android:padding="18dp"
         android:text="Music Player"
         android:textColor="#FFFFFF"
-        android:textSize="26sp"
+        android:textSize="25sp"
         android:textStyle="bold" />
 
     <androidx.media3.ui.PlayerView
         android:id="@+id/playerView"
         android:layout_width="match_parent"
-        android:layout_height="190dp"
-        android:background="#181818" />
+        android:layout_height="230dp"
+        android:background="#181818"
+        android:keepScreenOn="false"
+        app:show_buffering="when_playing"
+        app:show_shuffle_button="true"
+        app:show_subtitle_button="false"
+        app:show_previous_button="true"
+        app:show_next_button="true"
+        app:show_rewind_button="true"
+        app:show_fastforward_button="true"
+        xmlns:app="http://schemas.android.com/apk/res-auto" />
 
     <TextView
         android:id="@+id/songText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingStart="20dp"
-        android:paddingEnd="20dp"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
         android:paddingTop="12dp"
         android:text="Qo‘shiq tanlanmagan"
         android:textColor="#FFFFFF"
-        android:textSize="19sp"
-        android:textStyle="bold" />
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end" />
 
     <TextView
         android:id="@+id/artistText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingStart="20dp"
-        android:paddingEnd="20dp"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
         android:paddingBottom="10dp"
         android:text="Artist"
         android:textColor="#AAAAAA"
-        android:textSize="14sp" />
+        android:textSize="14sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
 
     <TextView
         android:id="@+id/libraryTitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="16dp"
+        android:padding="14dp"
         android:text="Barcha musiqalar"
         android:textColor="#FFFFFF"
         android:textSize="18sp"
